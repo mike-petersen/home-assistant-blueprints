@@ -1,0 +1,126 @@
+blueprint:
+  name: Mike Motion Light
+  description: Turn on light when motion detected and turn off after no motion for a set time or when it is bright enough.
+  domain: automation
+  input:
+    brightness_sensor:
+      name: Brightness Helper
+      description: Brightness Helper for the room
+      selector:
+        entity:
+          filter:
+            domain: binary_sensor
+    motion_sensor:
+      name: Motion Sensor
+      description: Motion sensor to detect motion.
+      selector:
+        entity:
+          filter:
+            domain: binary_sensor
+    night_mode_switch:
+      name: Night Mode Switch
+      description: Current state of the night mode.
+      selector:
+        entity:
+          filter:
+            domain: input_boolean
+    target_light:
+      name: Light
+      description: Light to turn on when motion is detected.
+      selector:
+        target:
+          entity:
+            domain: light
+    switch_target:
+      name: Switch
+      description: Optional switch to turn on when motion is detected.
+      default: {}
+      selector:
+        target:
+          entity:
+            domain: switch
+    no_motion_wait:
+      name: Wait time
+      description: Time to leave the light on after last motion is detected.
+      default: 120
+      selector:
+        number:
+          min: 0
+          max: 720
+          unit_of_measurement: seconds
+
+triggers:
+  - trigger: state
+    entity_id: !input motion_sensor
+    to: "on"
+  - trigger: state
+    entity_id: !input motion_sensor
+    to: "off"
+    for: !input no_motion_wait
+  - trigger: state
+    entity_id: !input brightness_sensor
+  - trigger: state
+    entity_id: !input night_mode_switch
+
+variables:
+  motion_sensor: !input motion_sensor
+  brightness_sensor: !input brightness_sensor
+
+actions:
+  - choose:
+      - conditions:
+          - condition: state
+            entity_id: !input motion_sensor
+            state: "on"
+          - condition: state
+            entity_id: !input brightness_sensor
+            state: "on"
+        sequence:
+          - choose:
+              - conditions:
+                  - condition: state
+                    entity_id: !input night_mode_switch
+                    state: "on"
+                sequence:
+                  - choose:
+                      - conditions:
+                          - condition: template
+                            value_template: "{{ switch_target is defined and switch_target != {} }}"
+                        sequence:
+                          - service: homeassistant.turn_on
+                            target: !input switch_target
+                  - service: light.turn_on
+                    target: !input target_light
+                    data:
+                      rgb_color: [255, 30, 30]
+                      brightness_pct: 100
+              - conditions:
+                  - condition: state
+                    entity_id: !input night_mode_switch
+                    state: "off"
+                sequence:
+                  - choose:
+                      - conditions:
+                          - condition: template
+                            value_template: "{{ switch_target is defined and switch_target != {} }}"
+                        sequence:
+                          - service: homeassistant.turn_on
+                            target: !input switch_target
+                  - service: light.turn_on
+                    target: !input target_light
+                    data:
+                      rgb_color: [255, 255, 255]
+                      brightness_pct: 70
+
+      - conditions:
+          - condition: or
+            conditions:
+              - condition: template
+                value_template: "{{ states(motion_sensor) != 'on' }}"
+              - condition: template
+                value_template: "{{ states(brightness_sensor) != 'on' }}"
+        sequence:
+          - service: light.turn_off
+            target: !input target_light
+            data:
+              transition: 8

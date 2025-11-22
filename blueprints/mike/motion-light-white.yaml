@@ -1,0 +1,89 @@
+blueprint:
+  name: Mike Motion Light White
+  description: Turn on light when motion detected and turn off after no motion for a set time or when it is bright enough.
+  domain: automation
+  input:
+    brightness_sensor:
+      name: Brightness Helper
+      description: Brightness Helper for the room
+      selector:
+        entity:
+          filter:
+            domain: binary_sensor
+    motion_sensor:
+      name: Motion Sensor
+      description: Motion sensor to detect motion.
+      selector:
+        entity:
+          filter:
+            domain: binary_sensor
+    target_light:
+      name: Light
+      description: Light to turn on when motion is detected.
+      selector:
+        target:
+          entity:
+            domain: light
+    switch_target:
+      name: Switch
+      description: Optional switch to turn on when motion is detected.
+      default: {}
+      selector:
+        target:
+          entity:
+            domain: switch
+    no_motion_wait:
+      name: Wait time
+      description: Time to leave the light on after last motion is detected.
+      default: 120
+      selector:
+        number:
+          min: 0
+          max: 720
+          unit_of_measurement: seconds
+
+triggers:
+  - trigger: state
+    entity_id: !input motion_sensor
+    to: 'on'
+  - trigger: state
+    entity_id: !input motion_sensor
+    to: 'off'
+    for: !input no_motion_wait
+  - trigger: state
+    entity_id: !input brightness_sensor
+    for: !input no_motion_wait
+
+actions:
+  - choose:
+      - conditions:
+          - condition: and
+            conditions:
+              - condition: state
+                entity_id: !input motion_sensor
+                state: 'on'
+              - condition: state
+                entity_id: !input brightness_sensor
+                state: 'on'
+        sequence:
+          - metadata: {}
+            data:
+              brightness_pct: 60
+              color_temp_kelvin: 305
+            target: !input target_light
+            action: light.turn_on
+      - conditions:
+          - condition: or
+            conditions:
+              - condition: state
+                entity_id: !input motion_sensor
+                state: 'off'
+              - condition: state
+                entity_id: !input brightness_sensor
+                state: 'off'
+        sequence:
+          - metadata: {}
+            data:
+              transition: 8
+            target: !input target_light
+            action: light.turn_off
