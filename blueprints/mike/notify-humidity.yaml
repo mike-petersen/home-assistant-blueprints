@@ -1,0 +1,152 @@
+blueprint:
+  name: Mike Notify Humidity
+  description: Notify if the humidity
+  domain: automation
+  input:
+    window_sensor:
+      name: Window Sensor
+      description: Window open/closed sensor
+      selector:
+        entity:
+          filter:
+            domain: binary_sensor
+    humidity_difference:
+      name: Luftfeuchtigkeit Unterschied
+      description: Difference of the absolute humidity between the room and the outside
+      selector:
+        entity:
+          filter:
+            domain: sensor
+    humidity_sensor:
+      name: Luftfeuchtigkeit
+      description: humidity of the room
+      selector:
+        entity:
+          filter:
+            domain: sensor
+    media_player:
+      name: Medien Player
+      description: media player to play back notifications
+      selector:
+        entity:
+          filter:
+            domain: media_player
+    media_content_open_window:
+      name: Media file opening window
+      description: Media file to play for opening a window
+      selector:
+        entity:
+          filter:
+            domain: media_content
+    media_content_close_window:
+      name: Media file closing window
+      description: Media file to play for closing a window
+      selector:
+        entity:
+          filter:
+            domain: media_content
+
+triggers:
+  - trigger: numeric_state
+    entity_id: !input humidity_difference
+    above: 4.5
+    id: above
+    for:
+      hours: 0
+      minutes: 5
+      seconds: 0
+  - platform: numeric_state
+    entity_id: !input humidity_sensor
+    above: 60
+    id: aboverel
+    for:
+      hours: 0
+      minutes: 5
+      seconds: 0
+  - trigger: numeric_state
+    entity_id: !input humidity_difference
+    below: 4
+    id: below
+    for:
+      hours: 0
+      minutes: 2
+      seconds: 0
+  - platform: numeric_state
+    entity_id: !input humidity_sensor
+    below: 56
+    id: belowrel
+    for:
+      hours: 0
+      minutes: 2
+      seconds: 0
+
+condition:
+  - condition: or
+    conditions:
+      - condition: trigger
+        id: below
+      - condition: and
+        conditions:
+          - condition: trigger
+            id: above
+          - condition: numeric_state
+            entity_id: !input humidity_sensor
+            above: 55
+      - condition: and
+        conditions:
+          - condition: trigger
+            id: aboverel
+          - condition: numeric_state
+            entity_id: !input humidity_difference
+            above: 3
+
+action:
+  - choose:
+      - conditions:
+          - condition: or
+            conditions:
+              - condition: trigger
+                id: above
+              - condition: trigger
+                id: aboverel
+        sequence:
+          - service: notify.notify
+            data:
+              title: Bitte Fenster öffnen
+              message: >-
+                Die Luftfeuchtigkeit in der Wohnung ist hoch im Vergleich zu
+                außen. Bitte ein Fenster öffnen!
+          - condition: time
+            after: "08:00:00"
+            before: "22:30:00"
+            weekday:
+              - mon
+              - tue
+              - wed
+              - thu
+              - fri
+              - sat
+              - sun
+          - service: media_player.play_media
+            data:
+              media_content_id: !input media_content_open_window
+              media_content_type: music
+              announce: true
+            target:
+              entity_id: !input media_player
+    default:
+      - condition: state
+        entity_id: !input window_sensor
+        state: "on"
+      - service: notify.notify
+        data:
+          title: Fenster kann wieder geschlossen werden.
+          message: Die Luftfeuchtigkeit hat sich ausreichend angeglichen.
+      - service: media_player.play_media
+        data:
+          media_content_id: !input media_content_close_window
+          media_content_type: music
+          announce: true
+        target:
+          entity_id: !input media_player
+mode: single
