@@ -73,13 +73,6 @@ blueprint:
         entity:
           filter:
             domain: sensor
-    temperature_outside:
-      name: Temperature Outside
-      description: Temperature Sensor outside
-      selector:
-        entity:
-          filter:
-            domain: sensor
     notification_string:
       name: Notification String
       description: String send as notification if temperature in room sinks
