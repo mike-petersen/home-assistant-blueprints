@@ -66,7 +66,6 @@ blueprint:
         entity:
           domain: notify
           multiple: true
-  source_url: https://github.com/mike-petersen/home-assistant-blueprints/tree/main/blueprints/mike/heater-window.yaml
 variables:
   open_action: !input open_action
   close_action: !input close_action
