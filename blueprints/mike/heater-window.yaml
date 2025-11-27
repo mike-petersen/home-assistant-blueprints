@@ -61,6 +61,7 @@ blueprint:
     notification_entities:
       name: Notifications Targets
       description: Notifications will be sent to the targets
+      default: []
       selector:
         entity:
           domain: notify
