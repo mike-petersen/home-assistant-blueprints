@@ -66,6 +66,35 @@ blueprint:
         entity:
           domain: notify
           multiple: true
+    temperature_room:
+      name: Temperature Room
+      description: Temperature Sensor in the room
+      selector:
+        entity:
+          filter:
+            domain: sensor
+    temperature_outside:
+      name: Temperature Outside
+      description: Temperature Sensor outside
+      selector:
+        entity:
+          filter:
+            domain: sensor
+    notification_string:
+      name: Notification String
+      description: String send as notification if temperature in room sinks
+      default: Temperatur in room low. Please close the window.
+    room_temperature:
+      name: Room Temperature
+      description: Temperature for the room
+      default: 18
+      selector:
+        number:
+          min: 10.0
+          max: 30.0
+          mode: slider
+          step: 1.0
+
 variables:
   open_action: !input open_action
   close_action: !input close_action
@@ -76,12 +105,22 @@ trigger:
     entity_id: !input window_entity
     to: 'on'
     for: !input minimum_open_time
+    id: window_open
+  - platform: state
+    entity_id: !input window_entity
+    to: 'off'
+    for: !input minimum_close_time
+    id: window_close
+  - platform: numeric_state
+    entity_id: !input temperature_room
+    below: !input room_temperature
+    id: temperature_low_in_room
+
 action:
   - choose:
       - conditions:
-          - condition: state
-            entity_id: !input climate_targets
-            state: heat
+          - condition: trigger
+            id: window_open
         sequence:
           - service: climate.turn_off
             target:
@@ -89,67 +128,29 @@ action:
           - choose:
               - conditions: '{{ open_action is defined and open_action | length > 0 }}'
                 sequence: !input open_action
-          - wait_for_trigger:
-              - platform: state
-                entity_id: !input window_entity
-                to: 'off'
-            continue_on_timeout: false
-          - delay: !input minimum_close_time
+      - conditions:
+          - condition: trigger
+            id: window_close
+        sequence:
+          - service: climate.turn_on
+            target:
+              entity_id: !input climate_targets
           - choose:
               - conditions: '{{ close_action is defined and close_action | length > 0 }}'
                 sequence: !input close_action
-          - service: climate.set_hvac_mode
+          - service: climate.set_temperature
             data:
+              temperature: !input room_temperature
               hvac_mode: heat
             target:
               entity_id: !input climate_targets
       - conditions:
-          - condition: state
-            entity_id: !input climate_targets
-            state: automatic
+          - condition: trigger
+            id: temperature_low_in_room
         sequence:
-          - service: climate.turn_off
-            target:
-              entity_id: !input climate_targets
-          - choose:
-              - conditions: '{{ open_action is defined and open_action | length > 0 }}'
-                sequence: !input open_action
-          - wait_for_trigger:
-              - platform: state
-                entity_id: !input window_entity
-                to: 'off'
-            continue_on_timeout: false
-          - delay: !input minimum_close_time
-          - choose:
-              - conditions: '{{ close_action is defined and close_action | length > 0 }}'
-                sequence: !input close_action
-          - service: climate.set_hvac_mode
+          - action: notify.send_message
+            metadata: {}
             data:
-              hvac_mode: automatic
+              message: !input notification_string
             target:
-              entity_id: !input climate_targets
-      - conditions:
-          - condition: state
-            entity_id: !input climate_targets
-            state: auto
-        sequence:
-          - service: climate.turn_off
-            target:
-              entity_id: !input climate_targets
-          - choose:
-              - conditions: '{{ open_action is defined and open_action | length > 0 }}'
-                sequence: !input open_action
-          - wait_for_trigger:
-              - platform: state
-                entity_id: !input window_entity
-                to: 'off'
-            continue_on_timeout: false
-          - delay: !input minimum_close_time
-          - choose:
-              - conditions: '{{ close_action is defined and close_action | length > 0 }}'
-                sequence: !input close_action
-          - service: climate.set_hvac_mode
-            data:
-              hvac_mode: auto
-            target:
-              entity_id: !input climate_targets
+              entity_id: !input notification_entities
