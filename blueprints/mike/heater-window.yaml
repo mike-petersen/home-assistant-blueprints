@@ -58,6 +58,12 @@ blueprint:
       default: []
       selector:
         action: {}
+    notification_action:
+      name: Additional Notification Action (Optional)
+      description: Action to perform if the notification is triggered
+      default: []
+      selector:
+        action: {}
     notification_entities:
       name: Notifications Targets
       description: Notifications will be sent to the targets
@@ -147,3 +153,6 @@ action:
               message: !input notification_string
             target:
               entity_id: !input notification_entities
+          - choose:
+              - conditions: '{{ notification_action is defined and notification_action | length > 0 }}'
+                sequence: !input notification_action
