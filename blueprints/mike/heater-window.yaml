@@ -86,8 +86,7 @@ action:
         sequence:
           - service: climate.turn_off
             target:
-              entity_id:
-                - !input climate_targets
+              entity_id: !input climate_targets
           - choose:
               - conditions: '{{ open_action is defined and open_action | length > 0 }}'
                 sequence: !input open_action
@@ -104,8 +103,7 @@ action:
             data:
               hvac_mode: heat
             target:
-              entity_id:
-                - !input climate_targets
+              entity_id: !input climate_targets
       - conditions:
           - condition: state
             entity_id: !input climate_targets
@@ -113,8 +111,7 @@ action:
         sequence:
           - service: climate.turn_off
             target:
-              entity_id:
-                - !input climate_targets
+              entity_id: !input climate_targets
           - choose:
               - conditions: '{{ open_action is defined and open_action | length > 0 }}'
                 sequence: !input open_action
@@ -131,8 +128,7 @@ action:
             data:
               hvac_mode: automatic
             target:
-              entity_id:
-                - !input climate_targets
+              entity_id: !input climate_targets
       - conditions:
           - condition: state
             entity_id: !input climate_targets
@@ -140,8 +136,7 @@ action:
         sequence:
           - service: climate.turn_off
             target:
-              entity_id:
-                - !input climate_targets
+              entity_id: !input climate_targets
           - choose:
               - conditions: '{{ open_action is defined and open_action | length > 0 }}'
                 sequence: !input open_action
@@ -158,5 +153,4 @@ action:
             data:
               hvac_mode: auto
             target:
-              entity_id:
-                - !input climate_targets
+              entity_id: !input climate_targets
