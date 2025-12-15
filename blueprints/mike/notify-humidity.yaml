@@ -24,27 +24,24 @@ blueprint:
         entity:
           filter:
             domain: sensor
-    media_player:
-      name: Medien Player
-      description: media player to play back notifications
+    open_action:
+      name: Additional Open Action (Optional)
+      description: Action to perform if the door/window sensor is opened (e.g. open
+        blind, tts announcement)
+      default: []
       selector:
-        entity:
-          filter:
-            domain: media_player
-    media_content_open_window:
-      name: Media file opening window
-      description: Media file to play for opening a window
+        action: {}
+    close_action:
+      name: Additional Close Action (Optional)
+      description: Action to perform if the door/window sensor is cloed again (e.g.
+        close blind, tts announcement)
+      default: []
       selector:
-        entity:
-          filter:
-            domain: media_content
-    media_content_close_window:
-      name: Media file closing window
-      description: Media file to play for closing a window
-      selector:
-        entity:
-          filter:
-            domain: media_content
+        action: {}
+
+variables:
+  open_action: !input open_action
+  close_action: !input close_action
 
 triggers:
   - trigger: numeric_state
@@ -127,13 +124,9 @@ action:
               - fri
               - sat
               - sun
-          - service: media_player.play_media
-            data:
-              media_content_id: !input media_content_open_window
-              media_content_type: music
-              announce: true
-            target:
-              entity_id: !input media_player
+          - choose:
+              - conditions: '{{ open_action is defined and open_action | length > 0 }}'
+                sequence: !input open_action
     default:
       - condition: state
         entity_id: !input window_sensor
@@ -142,11 +135,7 @@ action:
         data:
           title: Fenster kann wieder geschlossen werden.
           message: Die Luftfeuchtigkeit hat sich ausreichend angeglichen.
-      - service: media_player.play_media
-        data:
-          media_content_id: !input media_content_close_window
-          media_content_type: music
-          announce: true
-        target:
-          entity_id: !input media_player
+      - choose:
+          - conditions: '{{ close_action is defined and close_action | length > 0 }}'
+            sequence: !input close_action
 mode: single
