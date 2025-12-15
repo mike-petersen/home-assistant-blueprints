@@ -38,6 +38,22 @@ blueprint:
       default: []
       selector:
         action: {}
+    notification_entities:
+      name: Notifications Targets
+      description: Notifications will be sent to the targets
+      default: []
+      selector:
+        entity:
+          domain: notify
+          multiple: true
+    notification_open_string:
+      name: Notification String open window
+      description: String send as notification if window should be opened
+      default: The humidity in the apartment is high compared to outside. Please open a window!
+    notification_close_string:
+      name: Notification String close window
+      description: String send as notification if window should be closed
+      default: The humidity has adjusted sufficiently. Please close the window.
 
 variables:
   open_action: !input open_action
@@ -107,12 +123,12 @@ action:
               - condition: trigger
                 id: aboverel
         sequence:
-          - service: notify.notify
+          - action: notify.send_message
+            metadata: {}
             data:
-              title: Bitte Fenster öffnen
-              message: >-
-                Die Luftfeuchtigkeit in der Wohnung ist hoch im Vergleich zu
-                außen. Bitte ein Fenster öffnen!
+              message: !input notification_open_string
+            target:
+              entity_id: !input notification_entities
           - condition: time
             after: "08:00:00"
             before: "22:30:00"
@@ -131,10 +147,12 @@ action:
       - condition: state
         entity_id: !input window_sensor
         state: "on"
-      - service: notify.notify
+      - action: notify.send_message
+        metadata: {}
         data:
-          title: Fenster kann wieder geschlossen werden.
-          message: Die Luftfeuchtigkeit hat sich ausreichend angeglichen.
+          message: !input notification_close_string
+        target:
+          entity_id: !input notification_entities
       - choose:
           - conditions: '{{ close_action is defined and close_action | length > 0 }}'
             sequence: !input close_action
