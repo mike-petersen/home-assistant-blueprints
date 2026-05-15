@@ -27,3 +27,9 @@ We have a heat pump and due to that we want to turn on the heater everytime afte
 This triggers open/close window notification depending on the humidity difference.
 
 [Import Blueprint to Home Assistant: Notify Humidity](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fmike-petersen%2Fhome-assistant-blueprints%2Fblob%2Fmain%2Fblueprints%2Fmike%2Fnotify-humidity.yaml)
+
+## Warning Light
+
+This triggers a warning light (blinking) if a condition is met.
+
+[Import Blueprint to Home Assistant: Warning Light](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fmike-petersen%2Fhome-assistant-blueprints%2Fblob%2Fmain%2Fblueprints%2Fmike%2Fwarning-light.yaml)

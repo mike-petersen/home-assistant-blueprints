@@ -1,7 +1,7 @@
 blueprint:
   name: Mike Window open Heater control
   description: 'Climate device like heating and cooling devices (if active) are turned
-    off and go back to the previous set stage after the windows is closed again. You can also define a time before the 
+    off and go back to the previous set stage after the windows is closed again. You can also define a time before the
     climate device turns back to its previous state. Now it supports several heating modes and different vendors like Tado. The supported
     HAVC modes are: automatic, auto, heat, heat_cool and off. If you need more please
     let me know. Happy automating!'
@@ -72,6 +72,14 @@ blueprint:
         entity:
           domain: notify
           multiple: true
+    warning_status_helper:
+      name: Warning Status Helper (Optional)
+      description: Optional input_boolean that is turned on while the warning condition is active and turned off when it clears.
+      default: ""
+      selector:
+        entity:
+          filter:
+            domain: input_boolean
     temperature_room:
       name: Temperature Room
       description: Temperature Sensor in the room
@@ -117,6 +125,7 @@ variables:
   close_action: !input close_action
   notification_action: !input notification_action
   notification_entities: !input notification_entities
+  warning_status_helper: !input warning_status_helper
 
 mode: queued
 max: 10
@@ -136,9 +145,17 @@ trigger:
     below: !input room_temperature
     id: temperature_low_in_room
   - platform: numeric_state
+    entity_id: !input temperature_room
+    above: !input room_temperature
+    id: temperature_recovered_in_room
+  - platform: numeric_state
     entity_id: !input temperature_outside
     below: !input outside_temperature
     id: temperature_low_outside
+  - platform: numeric_state
+    entity_id: !input temperature_outside
+    above: !input outside_temperature
+    id: temperature_recovered_outside
 
 action:
   - choose:
@@ -186,6 +203,12 @@ action:
             below: !input outside_temperature
         sequence:
           - choose:
+              - conditions: '{{ warning_status_helper is defined and warning_status_helper | length > 0 }}'
+                sequence:
+                  - service: input_boolean.turn_on
+                    target:
+                      entity_id: !input warning_status_helper
+          - choose:
               - conditions: '{{ notification_entities is defined and notification_entities | length > 0 }}'
                 sequence:
                   - action: notify.send_message
@@ -197,3 +220,10 @@ action:
           - choose:
               - conditions: '{{ notification_action is defined and notification_action | length > 0 }}'
                 sequence: !input notification_action
+    default:
+      - choose:
+          - conditions: '{{ warning_status_helper is defined and warning_status_helper | length > 0 }}'
+            sequence:
+              - service: input_boolean.turn_off
+                target:
+                  entity_id: !input warning_status_helper

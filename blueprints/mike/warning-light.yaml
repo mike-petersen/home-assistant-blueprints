@@ -1,0 +1,152 @@
+blueprint:
+  name: Mike Warning Light
+  description: Blink selected lights while one or more warning status entities are active.
+  domain: automation
+  input:
+    warning_entities:
+      name: Warning Status Entities
+      description: Input booleans or groups that are on while a warning is active.
+      selector:
+        entity:
+          multiple: true
+          filter:
+            - domain: input_boolean
+            - domain: group
+    warning_lights:
+      name: Warning Lights
+      description: Lights that should blink while a warning is active.
+      selector:
+        entity:
+          multiple: true
+          filter:
+            domain: light
+    blink_color:
+      name: Blink Color
+      description: Color used while the lights blink.
+      default: [255, 0, 0]
+      selector:
+        color_rgb: {}
+    brightness:
+      name: Brightness
+      description: Brightness for the warning blink.
+      default: 100
+      selector:
+        number:
+          min: 1
+          max: 100
+          unit_of_measurement: "%"
+          mode: slider
+          step: 1
+    blink_count:
+      name: Blink Count
+      description: Number of blinks per warning cycle.
+      default: 6
+      selector:
+        number:
+          min: 1
+          max: 20
+          mode: slider
+          step: 1
+    blink_on_seconds:
+      name: Blink On Duration
+      description: Seconds each blink stays on.
+      default: 1
+      selector:
+        number:
+          min: 0.1
+          max: 10
+          unit_of_measurement: seconds
+          mode: slider
+          step: 0.1
+    blink_off_seconds:
+      name: Blink Off Duration
+      description: Seconds each blink stays off.
+      default: 1
+      selector:
+        number:
+          min: 0.1
+          max: 10
+          unit_of_measurement: seconds
+          mode: slider
+          step: 0.1
+    repeat_delay_seconds:
+      name: Repeat Delay
+      description: Seconds to wait before the next blink cycle while the warning remains active.
+      default: 60
+      selector:
+        number:
+          min: 0
+          max: 600
+          unit_of_measurement: seconds
+          mode: slider
+          step: 1
+    restore_previous_state:
+      name: Restore Previous Light State
+      description: Restore the selected lights to their previous state when no warning is active anymore.
+      default: true
+      selector:
+        boolean: {}
+    restore_scene_id:
+      name: Restore Scene ID
+      description: Internal scene id used to remember the previous light state. Use a unique value if you create multiple warning light automations.
+      default: heater_window_warning_light_before
+      selector:
+        text: {}
+
+variables:
+  warning_entities: !input warning_entities
+  warning_lights: !input warning_lights
+  restore_previous_state: !input restore_previous_state
+  restore_scene_id: !input restore_scene_id
+
+mode: single
+max_exceeded: silent
+
+trigger:
+  - platform: state
+    entity_id: !input warning_entities
+    to: "on"
+
+condition:
+  - condition: template
+    value_template: "{{ expand(warning_entities) | selectattr('state', 'eq', 'on') | list | count > 0 }}"
+
+action:
+  - choose:
+      - conditions: "{{ restore_previous_state }}"
+        sequence:
+          - service: scene.create
+            data:
+              scene_id: !input restore_scene_id
+              snapshot_entities: !input warning_lights
+
+  - repeat:
+      while:
+        - condition: template
+          value_template: "{{ expand(warning_entities) | selectattr('state', 'eq', 'on') | list | count > 0 }}"
+      sequence:
+        - repeat:
+            count: !input blink_count
+            sequence:
+              - service: light.turn_on
+                target:
+                  entity_id: !input warning_lights
+                data:
+                  rgb_color: !input blink_color
+                  brightness_pct: !input brightness
+              - delay:
+                  seconds: !input blink_on_seconds
+              - service: light.turn_off
+                target:
+                  entity_id: !input warning_lights
+              - delay:
+                  seconds: !input blink_off_seconds
+        - delay:
+            seconds: !input repeat_delay_seconds
+
+  - choose:
+      - conditions: "{{ restore_previous_state }}"
+        sequence:
+          - service: scene.turn_on
+            target:
+              entity_id: "scene.{{ restore_scene_id }}"
