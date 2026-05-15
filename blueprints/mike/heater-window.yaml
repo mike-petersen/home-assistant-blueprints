@@ -79,6 +79,13 @@ blueprint:
         entity:
           filter:
             domain: sensor
+    temperature_outside:
+      name: Temperature Outside
+      description: Outside temperature sensor. Notifications are only sent when this temperature is below the configured threshold.
+      selector:
+        entity:
+          filter:
+            domain: sensor
     notification_string:
       name: Notification String
       description: String send as notification if temperature in room sinks
@@ -93,12 +100,26 @@ blueprint:
           max: 30.0
           mode: slider
           step: 1.0
+    outside_temperature:
+      name: Outside Temperature
+      description: Outside temperature threshold for notifications.
+      default: 5
+      selector:
+        number:
+          min: -20.0
+          max: 20.0
+          unit_of_measurement: "°C"
+          mode: slider
+          step: 1.0
 
 variables:
   open_action: !input open_action
   close_action: !input close_action
+  notification_action: !input notification_action
+  notification_entities: !input notification_entities
 
-mode: single
+mode: queued
+max: 10
 trigger:
   - platform: state
     entity_id: !input window_entity
@@ -114,6 +135,10 @@ trigger:
     entity_id: !input temperature_room
     below: !input room_temperature
     id: temperature_low_in_room
+  - platform: numeric_state
+    entity_id: !input temperature_outside
+    below: !input outside_temperature
+    id: temperature_low_outside
 
 action:
   - choose:
@@ -143,16 +168,32 @@ action:
               hvac_mode: heat
             target:
               entity_id: !input climate_targets
+  - choose:
       - conditions:
           - condition: trigger
-            id: temperature_low_in_room
+            id:
+              - window_open
+              - temperature_low_in_room
+              - temperature_low_outside
+          - condition: state
+            entity_id: !input window_entity
+            state: 'on'
+          - condition: numeric_state
+            entity_id: !input temperature_room
+            below: !input room_temperature
+          - condition: numeric_state
+            entity_id: !input temperature_outside
+            below: !input outside_temperature
         sequence:
-          - action: notify.send_message
-            metadata: {}
-            data:
-              message: !input notification_string
-            target:
-              entity_id: !input notification_entities
+          - choose:
+              - conditions: '{{ notification_entities is defined and notification_entities | length > 0 }}'
+                sequence:
+                  - action: notify.send_message
+                    metadata: {}
+                    data:
+                      message: !input notification_string
+                    target:
+                      entity_id: !input notification_entities
           - choose:
               - conditions: '{{ notification_action is defined and notification_action | length > 0 }}'
                 sequence: !input notification_action
