@@ -1,229 +1,154 @@
 blueprint:
-  name: Mike Window open Heater control
-  description: 'Climate device like heating and cooling devices (if active) are turned
-    off and go back to the previous set stage after the windows is closed again. You can also define a time before the
-    climate device turns back to its previous state. Now it supports several heating modes and different vendors like Tado. The supported
-    HAVC modes are: automatic, auto, heat, heat_cool and off. If you need more please
-    let me know. Happy automating!'
+  name: Mike Warning Light
+  description: Blink selected lights while one or more warning status entities are active.
   domain: automation
   input:
-    window_entity:
-      name: Window Sensor
-      description: The window sensor that controls the climate entity. If you have
-        more window sensors please make a group sensor.
+    warning_entities:
+      name: Warning Status Entities
+      description: Input booleans, groups, binary sensors, or switches that are on while a warning is active.
       selector:
         entity:
-          domain: binary_sensor
-          multiple: false
-    minimum_open_time:
-      name: Miniumum open time
-      description: Time in seconds to wait until the automation is triggered
-      default: 4
+          multiple: true
+          filter:
+            - domain: input_boolean
+            - domain: group
+            - domain: binary_sensor
+            - domain: switch
+    warning_lights:
+      name: Warning Lights
+      description: Lights that should blink while a warning is active.
+      selector:
+        entity:
+          multiple: true
+          filter:
+            domain: light
+    blink_color:
+      name: Blink Color
+      description: Color used while the lights blink.
+      default: [255, 0, 0]
+      selector:
+        color_rgb: {}
+    brightness:
+      name: Brightness
+      description: Brightness for the warning blink.
+      default: 100
       selector:
         number:
-          min: 0.0
-          max: 120.0
+          min: 1
+          max: 100
+          unit_of_measurement: "%"
+          mode: slider
+          step: 1
+    blink_count:
+      name: Blink Count
+      description: Number of blinks per warning cycle.
+      default: 6
+      selector:
+        number:
+          min: 1
+          max: 20
+          mode: slider
+          step: 1
+    blink_on_seconds:
+      name: Blink On Duration
+      description: Seconds each blink stays on.
+      default: 1
+      selector:
+        number:
+          min: 0.1
+          max: 10
           unit_of_measurement: seconds
           mode: slider
-          step: 1.0
-    minimum_close_time:
-      name: Miniumum close time
-      description: Time in seconds to wait until the climate entity is turned on again
-      default: 4
+          step: 0.1
+    blink_off_seconds:
+      name: Blink Off Duration
+      description: Seconds each blink stays off.
+      default: 1
       selector:
         number:
-          min: 0.0
-          max: 300.0
+          min: 0.1
+          max: 10
           unit_of_measurement: seconds
           mode: slider
-          step: 1.0
-    climate_targets:
-      name: Climate Devices
-      description: The climate entities that are controlled by the window sensor.
-      selector:
-        entity:
-          domain: climate
-          multiple: true
-    open_action:
-      name: Additional Open Action (Optional)
-      description: Action to perform if the door/window sensor is opened (e.g. open
-        blind, tts announcement)
-      default: []
-      selector:
-        action: {}
-    close_action:
-      name: Additional Close Action (Optional)
-      description: Action to perform if the door/window sensor is cloed again (e.g.
-        close blind, tts announcement)
-      default: []
-      selector:
-        action: {}
-    notification_action:
-      name: Additional Notification Action (Optional)
-      description: Action to perform if the notification is triggered
-      default: []
-      selector:
-        action: {}
-    notification_entities:
-      name: Notifications Targets
-      description: Notifications will be sent to the targets
-      default: []
-      selector:
-        entity:
-          domain: notify
-          multiple: true
-    warning_status_helper:
-      name: Warning Status Helper (Optional)
-      description: Optional input_boolean that is turned on while the warning condition is active and turned off when it clears.
-      default: ""
-      selector:
-        entity:
-          filter:
-            domain: input_boolean
-    temperature_room:
-      name: Temperature Room
-      description: Temperature Sensor in the room
-      selector:
-        entity:
-          filter:
-            domain: sensor
-    temperature_outside:
-      name: Temperature Outside
-      description: Outside temperature sensor. Notifications are only sent when this temperature is below the configured threshold.
-      selector:
-        entity:
-          filter:
-            domain: sensor
-    notification_string:
-      name: Notification String
-      description: String send as notification if temperature in room sinks
-      default: Temperatur in room low. Please close the window.
-    room_temperature:
-      name: Room Temperature
-      description: Temperature for the room
-      default: 18
+          step: 0.1
+    repeat_delay_seconds:
+      name: Repeat Delay
+      description: Seconds to wait before the next blink cycle while the warning remains active.
+      default: 60
       selector:
         number:
-          min: 10.0
-          max: 30.0
+          min: 0
+          max: 600
+          unit_of_measurement: seconds
           mode: slider
-          step: 1.0
-    outside_temperature:
-      name: Outside Temperature
-      description: Outside temperature threshold for notifications.
-      default: 5
+          step: 1
+    restore_previous_state:
+      name: Restore Previous Light State
+      description: Restore the selected lights to their previous state when no warning is active anymore.
+      default: true
       selector:
-        number:
-          min: -20.0
-          max: 20.0
-          unit_of_measurement: "°C"
-          mode: slider
-          step: 1.0
+        boolean: {}
+    restore_scene_id:
+      name: Restore Scene ID
+      description: Internal scene id used to remember the previous light state. Use a unique value if you create multiple warning light automations.
+      default: heater_window_warning_light_before
+      selector:
+        text: {}
 
 variables:
-  open_action: !input open_action
-  close_action: !input close_action
-  notification_action: !input notification_action
-  notification_entities: !input notification_entities
-  warning_status_helper: !input warning_status_helper
+  warning_entities: !input warning_entities
+  warning_lights: !input warning_lights
+  restore_previous_state: !input restore_previous_state
+  restore_scene_id: !input restore_scene_id
 
-mode: queued
-max: 10
+mode: single
+max_exceeded: silent
+
 trigger:
   - platform: state
-    entity_id: !input window_entity
-    to: 'on'
-    for: !input minimum_open_time
-    id: window_open
-  - platform: state
-    entity_id: !input window_entity
-    to: 'off'
-    for: !input minimum_close_time
-    id: window_close
-  - platform: numeric_state
-    entity_id: !input temperature_room
-    below: !input room_temperature
-    id: temperature_low_in_room
-  - platform: numeric_state
-    entity_id: !input temperature_room
-    above: !input room_temperature
-    id: temperature_recovered_in_room
-  - platform: numeric_state
-    entity_id: !input temperature_outside
-    below: !input outside_temperature
-    id: temperature_low_outside
-  - platform: numeric_state
-    entity_id: !input temperature_outside
-    above: !input outside_temperature
-    id: temperature_recovered_outside
+    entity_id: !input warning_entities
+    to: "on"
+
+condition:
+  - condition: template
+    value_template: "{{ expand(warning_entities) | selectattr('state', 'eq', 'on') | list | count > 0 }}"
 
 action:
   - choose:
-      - conditions:
-          - condition: trigger
-            id: window_open
+      - conditions: "{{ restore_previous_state }}"
         sequence:
-          - service: climate.turn_off
-            target:
-              entity_id: !input climate_targets
-          - choose:
-              - conditions: '{{ open_action is defined and open_action | length > 0 }}'
-                sequence: !input open_action
-      - conditions:
-          - condition: trigger
-            id: window_close
-        sequence:
-          - service: climate.turn_on
-            target:
-              entity_id: !input climate_targets
-          - choose:
-              - conditions: '{{ close_action is defined and close_action | length > 0 }}'
-                sequence: !input close_action
-          - service: climate.set_temperature
+          - service: scene.create
             data:
-              temperature: !input room_temperature
-              hvac_mode: heat
-            target:
-              entity_id: !input climate_targets
-  - choose:
-      - conditions:
-          - condition: trigger
-            id:
-              - window_open
-              - temperature_low_in_room
-              - temperature_low_outside
-          - condition: state
-            entity_id: !input window_entity
-            state: 'on'
-          - condition: numeric_state
-            entity_id: !input temperature_room
-            below: !input room_temperature
-          - condition: numeric_state
-            entity_id: !input temperature_outside
-            below: !input outside_temperature
-        sequence:
-          - choose:
-              - conditions: '{{ warning_status_helper is defined and warning_status_helper | length > 0 }}'
-                sequence:
-                  - service: input_boolean.turn_on
-                    target:
-                      entity_id: !input warning_status_helper
-          - choose:
-              - conditions: '{{ notification_entities is defined and notification_entities | length > 0 }}'
-                sequence:
-                  - action: notify.send_message
-                    metadata: {}
-                    data:
-                      message: !input notification_string
-                    target:
-                      entity_id: !input notification_entities
-          - choose:
-              - conditions: '{{ notification_action is defined and notification_action | length > 0 }}'
-                sequence: !input notification_action
-    default:
-      - choose:
-          - conditions: '{{ warning_status_helper is defined and warning_status_helper | length > 0 }}'
+              scene_id: !input restore_scene_id
+              snapshot_entities: !input warning_lights
+
+  - repeat:
+      while:
+        - condition: template
+          value_template: "{{ expand(warning_entities) | selectattr('state', 'eq', 'on') | list | count > 0 }}"
+      sequence:
+        - repeat:
+            count: !input blink_count
             sequence:
-              - service: input_boolean.turn_off
+              - service: light.turn_on
                 target:
-                  entity_id: !input warning_status_helper
+                  entity_id: !input warning_lights
+                data:
+                  rgb_color: !input blink_color
+                  brightness_pct: !input brightness
+              - delay:
+                  seconds: !input blink_on_seconds
+              - service: light.turn_off
+                target:
+                  entity_id: !input warning_lights
+              - delay:
+                  seconds: !input blink_off_seconds
+        - delay:
+            seconds: !input repeat_delay_seconds
+
+  - choose:
+      - conditions: "{{ restore_previous_state }}"
+        sequence:
+          - service: scene.turn_on
+            target:
+              entity_id: "scene.{{ restore_scene_id }}"
