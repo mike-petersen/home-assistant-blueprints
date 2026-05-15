@@ -5,13 +5,15 @@ blueprint:
   input:
     warning_entities:
       name: Warning Status Entities
-      description: Input booleans or groups that are on while a warning is active.
+      description: Input booleans, groups, binary sensors, or switches that are on while a warning is active.
       selector:
         entity:
           multiple: true
           filter:
             - domain: input_boolean
             - domain: group
+            - domain: binary_sensor
+            - domain: switch
     warning_lights:
       name: Warning Lights
       description: Lights that should blink while a warning is active.
