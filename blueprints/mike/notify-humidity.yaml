@@ -3,6 +3,11 @@ blueprint:
   description: Notify if the humidity
   domain: automation
   input:
+    room_name:
+      name: Raumname
+      description: Name des Raums oder Fensters (wird als Titel der Benachrichtigung angezeigt, z.B. "Schlafzimmer")
+      selector:
+        text: {}
     window_sensor:
       name: Window Sensor
       description: Window open/closed sensor
@@ -56,6 +61,7 @@ blueprint:
       default: The humidity has adjusted sufficiently. Please close the window.
 
 variables:
+  room_name: !input room_name
   open_action: !input open_action
   close_action: !input close_action
 
@@ -126,6 +132,7 @@ action:
           - action: notify.send_message
             metadata: {}
             data:
+              title: "Fenster öffnen - {{ room_name }}"
               message: !input notification_open_string
             target:
               entity_id: !input notification_entities
@@ -150,6 +157,7 @@ action:
       - action: notify.send_message
         metadata: {}
         data:
+          title: "Fenster schließen - {{ room_name }}"
           message: !input notification_close_string
         target:
           entity_id: !input notification_entities
