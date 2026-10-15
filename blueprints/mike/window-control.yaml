@@ -1,0 +1,519 @@
+blueprint:
+  name: Mike Window Control
+  description: >
+    Alles rund um ein Fenster in einem Raum in einer Automation:
+    Heizung aus wenn das Fenster offen ist und wieder an (mit Sollwert) wenn es
+    geschlossen wird; Kälte-Warnung (Warn-Helper + Benachrichtigung + Sound) wenn das
+    Fenster offen ist während Raum und Außentemperatur unter den Schwellen liegen;
+    Lüftungs-Hinweise (Fenster öffnen / schließen) anhand der absoluten
+    Luftfeuchtigkeits-Differenz zu außen und der relativen Luftfeuchtigkeit.
+    Benachrichtigungen und Sounds werden nur innerhalb der aktiven Zeit ausgegeben,
+    Heizungssteuerung und Warn-Helper laufen immer.
+  domain: automation
+  author: Mike Petersen
+  source_url: https://github.com/mike-petersen/home-assistant-blueprints/blob/main/blueprints/mike/window-control.yaml
+  homeassistant:
+    min_version: "2024.10.0"
+  input:
+    room:
+      name: Raum
+      icon: mdi:door
+      input:
+        room_name:
+          name: Raumname
+          description: Wird in den Benachrichtigungen verwendet, z.B. "Küche".
+          selector:
+            text: {}
+        window_sensor:
+          name: Fenstersensor
+          description: Fenster-/Türkontakt (bei mehreren Fenstern eine Gruppe verwenden).
+          selector:
+            entity:
+              filter:
+                domain: binary_sensor
+    heating:
+      name: Heizung
+      icon: mdi:radiator
+      input:
+        climate_targets:
+          name: Thermostate
+          description: Werden bei offenem Fenster ausgeschaltet und nach dem Schließen wieder auf den Sollwert gesetzt. Leer lassen, wenn der Raum keine Heizungssteuerung braucht.
+          default: []
+          selector:
+            entity:
+              multiple: true
+              filter:
+                domain: climate
+        room_temperature:
+          name: Soll-Temperatur
+          description: Wird nach dem Schließen des Fensters gesetzt und ist zugleich die Schwelle für die Kälte-Warnung.
+          default: 20
+          selector:
+            number:
+              min: 10
+              max: 30
+              step: 0.5
+              unit_of_measurement: "°C"
+              mode: slider
+        minimum_open_time:
+          name: Mindest-Öffnungszeit
+          description: Sekunden, die das Fenster offen sein muss, bevor reagiert wird.
+          default: 4
+          selector:
+            number:
+              min: 0
+              max: 120
+              unit_of_measurement: seconds
+              mode: slider
+        minimum_close_time:
+          name: Mindest-Schließzeit
+          description: Sekunden, die das Fenster geschlossen sein muss, bevor die Heizung wieder eingeschaltet wird.
+          default: 4
+          selector:
+            number:
+              min: 0
+              max: 300
+              unit_of_measurement: seconds
+              mode: slider
+    cold_warning:
+      name: Kälte-Warnung
+      icon: mdi:snowflake-alert
+      input:
+        enable_cold_warning:
+          name: Kälte-Warnung aktiv
+          default: true
+          selector:
+            boolean: {}
+        temperature_room:
+          name: Raumtemperatur
+          selector:
+            entity:
+              filter:
+                domain: sensor
+        temperature_outside:
+          name: Außentemperatur
+          selector:
+            entity:
+              filter:
+                domain: sensor
+        outside_temperature:
+          name: Außentemperatur-Schwelle
+          description: Die Kälte-Warnung wird nur ausgelöst, wenn die Außentemperatur unter diesem Wert liegt.
+          default: 5
+          selector:
+            number:
+              min: -20
+              max: 20
+              unit_of_measurement: "°C"
+              mode: slider
+        warning_status_helper:
+          name: Warn-Helper (optional)
+          description: Input Boolean, das an ist solange die Kälte-Warnung aktiv ist (z.B. für ein Warnlicht).
+          default: ""
+          selector:
+            entity:
+              filter:
+                domain: input_boolean
+        cold_message:
+          name: Text Kälte-Warnung
+          default: "Die Temperatur im Raum {{ room_name }} ist niedrig. Bitte das Fenster schließen!"
+          selector:
+            text: {}
+    humidity:
+      name: Luftfeuchtigkeit
+      icon: mdi:water-percent
+      input:
+        enable_humidity:
+          name: Lüftungs-Hinweise aktiv
+          default: true
+          selector:
+            boolean: {}
+        humidity_difference:
+          name: Absolute Luftfeuchtigkeit Differenz
+          description: Sensor mit der Differenz der absoluten Luftfeuchtigkeit zwischen Raum und außen (g/m³).
+          selector:
+            entity:
+              filter:
+                domain: sensor
+        humidity_sensor:
+          name: Relative Luftfeuchtigkeit
+          description: Relative Luftfeuchtigkeit im Raum (%).
+          selector:
+            entity:
+              filter:
+                domain: sensor
+        open_message:
+          name: Text Fenster öffnen
+          default: "Die Luftfeuchtigkeit im Raum {{ room_name }} ist hoch im Vergleich zu außen. Bitte ein Fenster öffnen!"
+          selector:
+            text: {}
+        close_message:
+          name: Text Fenster schließen
+          default: "Die Luftfeuchtigkeit hat sich ausreichend angeglichen. Bitte das Fenster im Raum {{ room_name }} schließen."
+          selector:
+            text: {}
+    humidity_thresholds:
+      name: Luftfeuchtigkeit Schwellwerte
+      icon: mdi:tune
+      collapsed: true
+      input:
+        humidity_diff_high:
+          name: Differenz hoch
+          description: Ab dieser absoluten Differenz (g/m³) wird zum Öffnen geraten.
+          default: 4.5
+          selector:
+            number:
+              min: 0
+              max: 15
+              step: 0.1
+              mode: box
+        humidity_diff_low:
+          name: Differenz niedrig
+          description: Unter dieser absoluten Differenz (g/m³) wird zum Schließen geraten.
+          default: 4
+          selector:
+            number:
+              min: 0
+              max: 15
+              step: 0.1
+              mode: box
+        humidity_diff_min:
+          name: Differenz Mindestwert
+          description: Beim Hinweis aufgrund hoher relativer Luftfeuchtigkeit muss die absolute Differenz über diesem Wert liegen.
+          default: 3
+          selector:
+            number:
+              min: 0
+              max: 15
+              step: 0.1
+              mode: box
+        humidity_rel_high:
+          name: Relativ hoch
+          description: Ab dieser relativen Luftfeuchtigkeit (%) wird zum Öffnen geraten.
+          default: 60
+          selector:
+            number:
+              min: 30
+              max: 100
+              step: 1
+              unit_of_measurement: "%"
+              mode: box
+        humidity_rel_low:
+          name: Relativ niedrig
+          description: Unter dieser relativen Luftfeuchtigkeit (%) wird zum Schließen geraten.
+          default: 56
+          selector:
+            number:
+              min: 30
+              max: 100
+              step: 1
+              unit_of_measurement: "%"
+              mode: box
+        humidity_rel_min:
+          name: Relativ Mindestwert
+          description: Beim Hinweis aufgrund hoher absoluter Differenz muss die relative Luftfeuchtigkeit über diesem Wert liegen.
+          default: 55
+          selector:
+            number:
+              min: 30
+              max: 100
+              step: 1
+              unit_of_measurement: "%"
+              mode: box
+        humidity_high_for:
+          name: Dauer hoch
+          description: So lange muss der Wert über der Schwelle liegen, bevor zum Öffnen geraten wird.
+          default:
+            hours: 0
+            minutes: 5
+            seconds: 0
+          selector:
+            duration: {}
+        humidity_low_for:
+          name: Dauer niedrig
+          description: So lange muss der Wert unter der Schwelle liegen, bevor zum Schließen geraten wird.
+          default:
+            hours: 0
+            minutes: 2
+            seconds: 0
+          selector:
+            duration: {}
+    notifications:
+      name: Benachrichtigungen
+      icon: mdi:bell
+      input:
+        notification_entities:
+          name: Benachrichtigungsziele
+          description: Notify-Entitäten (z.B. Text-zu-Sprache auf dem Tablet).
+          default: []
+          selector:
+            entity:
+              multiple: true
+              filter:
+                domain: notify
+        media_player:
+          name: Media Player für Sounds (optional)
+          default: ""
+          selector:
+            entity:
+              filter:
+                domain: media_player
+        open_sound:
+          name: Sound Fenster öffnen
+          default: media-source://media_source/local/OpenWindow.mp3
+          selector:
+            text: {}
+        close_sound:
+          name: Sound Fenster schließen
+          default: media-source://media_source/local/CloseWindow.mp3
+          selector:
+            text: {}
+        active_after:
+          name: Aktiv ab
+          description: Benachrichtigungen und Sounds nur ab dieser Uhrzeit.
+          default: "08:00:00"
+          selector:
+            time: {}
+        active_before:
+          name: Aktiv bis
+          description: Benachrichtigungen und Sounds nur bis zu dieser Uhrzeit.
+          default: "22:30:00"
+          selector:
+            time: {}
+
+mode: queued
+max: 10
+
+variables:
+  room_name: !input room_name
+  enable_cold_warning: !input enable_cold_warning
+  climate_targets: !input climate_targets
+  warning_status_helper: !input warning_status_helper
+  notification_entities: !input notification_entities
+  media_player: !input media_player
+  open_sound: !input open_sound
+  close_sound: !input close_sound
+  cold_message: !input cold_message
+  open_message: !input open_message
+  close_message: !input close_message
+
+triggers:
+  - trigger: state
+    entity_id: !input window_sensor
+    to: "on"
+    for: !input minimum_open_time
+    id: window_open
+  - trigger: state
+    entity_id: !input window_sensor
+    to: "off"
+    for: !input minimum_close_time
+    id: window_close
+  - trigger: numeric_state
+    entity_id: !input temperature_room
+    below: !input room_temperature
+    id: temp_room_low
+    enabled: !input enable_cold_warning
+  - trigger: numeric_state
+    entity_id: !input temperature_room
+    above: !input room_temperature
+    id: temp_room_ok
+    enabled: !input enable_cold_warning
+  - trigger: numeric_state
+    entity_id: !input temperature_outside
+    below: !input outside_temperature
+    id: temp_out_low
+    enabled: !input enable_cold_warning
+  - trigger: numeric_state
+    entity_id: !input temperature_outside
+    above: !input outside_temperature
+    id: temp_out_ok
+    enabled: !input enable_cold_warning
+  - trigger: numeric_state
+    entity_id: !input humidity_difference
+    above: !input humidity_diff_high
+    for: !input humidity_high_for
+    id: hum_diff_high
+    enabled: !input enable_humidity
+  - trigger: numeric_state
+    entity_id: !input humidity_sensor
+    above: !input humidity_rel_high
+    for: !input humidity_high_for
+    id: hum_rel_high
+    enabled: !input enable_humidity
+  - trigger: numeric_state
+    entity_id: !input humidity_difference
+    below: !input humidity_diff_low
+    for: !input humidity_low_for
+    id: hum_diff_low
+    enabled: !input enable_humidity
+  - trigger: numeric_state
+    entity_id: !input humidity_sensor
+    below: !input humidity_rel_low
+    for: !input humidity_low_for
+    id: hum_rel_low
+    enabled: !input enable_humidity
+
+actions:
+  # ---------------------------------------------------------------- Heizung
+  - choose:
+      - conditions:
+          - condition: trigger
+            id: window_open
+          - "{{ climate_targets | length > 0 }}"
+        sequence:
+          - action: climate.turn_off
+            target:
+              entity_id: !input climate_targets
+      - conditions:
+          - condition: trigger
+            id: window_close
+          - "{{ climate_targets | length > 0 }}"
+        sequence:
+          - action: climate.turn_on
+            target:
+              entity_id: !input climate_targets
+          - action: climate.set_temperature
+            target:
+              entity_id: !input climate_targets
+            data:
+              temperature: !input room_temperature
+              hvac_mode: heat
+
+  # ---------------------------------------------------------- Kälte-Warnung
+  - choose:
+      - conditions:
+          - condition: trigger
+            id:
+              - window_open
+              - temp_room_low
+              - temp_out_low
+          - "{{ enable_cold_warning }}"
+          - condition: state
+            entity_id: !input window_sensor
+            state: "on"
+          - condition: numeric_state
+            entity_id: !input temperature_room
+            below: !input room_temperature
+          - condition: numeric_state
+            entity_id: !input temperature_outside
+            below: !input outside_temperature
+        sequence:
+          - if:
+              - "{{ warning_status_helper | length > 0 }}"
+            then:
+              - action: input_boolean.turn_on
+                target:
+                  entity_id: !input warning_status_helper
+          - condition: time
+            after: !input active_after
+            before: !input active_before
+          - if:
+              - "{{ notification_entities | length > 0 }}"
+            then:
+              - action: notify.send_message
+                data:
+                  title: "Fenster schließen - {{ room_name }}"
+                  message: "{{ cold_message }}"
+                target:
+                  entity_id: !input notification_entities
+          - if:
+              - "{{ media_player | length > 0 }}"
+            then:
+              - action: media_player.play_media
+                target:
+                  entity_id: "{{ media_player }}"
+                data:
+                  media_content_id: "{{ close_sound }}"
+                  media_content_type: audio/mpeg
+      - conditions:
+          - condition: trigger
+            id:
+              - window_open
+              - window_close
+              - temp_room_low
+              - temp_room_ok
+              - temp_out_low
+              - temp_out_ok
+          - "{{ warning_status_helper | length > 0 }}"
+        sequence:
+          - action: input_boolean.turn_off
+            target:
+              entity_id: !input warning_status_helper
+
+  # -------------------------------------------------------- Luftfeuchtigkeit
+  - choose:
+      # Fenster öffnen: Differenz hoch (und relativ über Mindestwert)
+      # oder relativ hoch (und Differenz über Mindestwert). Nur bei geschlossenem Fenster.
+      - conditions:
+          - condition: or
+            conditions:
+              - condition: and
+                conditions:
+                  - condition: trigger
+                    id: hum_diff_high
+                  - condition: numeric_state
+                    entity_id: !input humidity_sensor
+                    above: !input humidity_rel_min
+              - condition: and
+                conditions:
+                  - condition: trigger
+                    id: hum_rel_high
+                  - condition: numeric_state
+                    entity_id: !input humidity_difference
+                    above: !input humidity_diff_min
+          - condition: state
+            entity_id: !input window_sensor
+            state: "off"
+          - condition: time
+            after: !input active_after
+            before: !input active_before
+        sequence:
+          - if:
+              - "{{ notification_entities | length > 0 }}"
+            then:
+              - action: notify.send_message
+                data:
+                  title: "Fenster öffnen - {{ room_name }}"
+                  message: "{{ open_message }}"
+                target:
+                  entity_id: !input notification_entities
+          - if:
+              - "{{ media_player | length > 0 }}"
+            then:
+              - action: media_player.play_media
+                target:
+                  entity_id: "{{ media_player }}"
+                data:
+                  media_content_id: "{{ open_sound }}"
+                  media_content_type: audio/mpeg
+      # Fenster schließen: Differenz oder relativ wieder niedrig, Fenster ist offen.
+      - conditions:
+          - condition: trigger
+            id:
+              - hum_diff_low
+              - hum_rel_low
+          - condition: state
+            entity_id: !input window_sensor
+            state: "on"
+          - condition: time
+            after: !input active_after
+            before: !input active_before
+        sequence:
+          - if:
+              - "{{ notification_entities | length > 0 }}"
+            then:
+              - action: notify.send_message
+                data:
+                  title: "Fenster schließen - {{ room_name }}"
+                  message: "{{ close_message }}"
+                target:
+                  entity_id: !input notification_entities
+          - if:
+              - "{{ media_player | length > 0 }}"
+            then:
+              - action: media_player.play_media
+                target:
+                  entity_id: "{{ media_player }}"
+                data:
+                  media_content_id: "{{ close_sound }}"
+                  media_content_type: audio/mpeg
