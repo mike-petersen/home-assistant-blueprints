@@ -403,7 +403,7 @@ actions:
             then:
               - action: input_boolean.turn_on
                 target:
-                  entity_id: !input warning_status_helper
+                  entity_id: "{{ warning_status_helper }}"
           - condition: time
             after: !input active_after
             before: !input active_before
@@ -438,7 +438,7 @@ actions:
         sequence:
           - action: input_boolean.turn_off
             target:
-              entity_id: !input warning_status_helper
+              entity_id: "{{ warning_status_helper }}"
 
   # -------------------------------------------------------- Luftfeuchtigkeit
   - choose:
